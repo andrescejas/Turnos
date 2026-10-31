@@ -1,0 +1,13 @@
+{
+  "name": "turnos-gestion",
+  "version": "1.0.0",
+  "description": "Sistema de Gestion y Auditoria de Turnos",
+  "scripts": {
+    "start": "node server.js",
+    "auditar": "node ejecutar_auditoria.js"
+  },
+  "dependencies": {
+    "string-similarity": "^4.0.4",
+    "xlsx": "^0.18.5"
+  }
+}

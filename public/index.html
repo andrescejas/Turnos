@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Dashboard en tiempo real para gestión, capacidad y auditoría de turnos y pacientes">
+    <title>Panel de Control y Auditoría de Turnos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Top Header -->
+    <header class="top-header" id="main-header">
+        <div class="header-container">
+            <div class="brand">
+                <div class="brand-icon">🩺</div>
+                <div>
+                    <h1 class="brand-title">Gestión & Capacidad de Turnos</h1>
+                    <p class="brand-subtitle">Auditoría continua de agenda y pacientes • Google Calendar ↔ Excel</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div class="live-pill" id="live-pill">
+                    <span class="pulse-dot"></span>
+                    <span id="live-status-text">Sincronizado con Turnos.xlsx</span>
+                </div>
+                <button class="btn btn-primary" id="btn-refresh" onclick="forceRefresh()">
+                    <span class="btn-icon">🔄</span> Recalcular Ahora
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-content" id="main-content">
+        <!-- Notification Banner if critical alerts exist -->
+        <div class="alert-banner" id="critical-banner" style="display: none;">
+            <div class="alert-banner-icon">⚠️</div>
+            <div class="alert-banner-content" id="critical-banner-text">
+                Detectados sobrecupos en agenda y pacientes inactivos con turnos a futuro.
+            </div>
+        </div>
+
+        <!-- Metric Stat Cards -->
+        <section class="stats-grid" id="stats-section">
+            <div class="stat-card" id="card-total-turnos">
+                <div class="stat-header">
+                    <span class="stat-title">Total Turnos Evaluados</span>
+                    <span class="stat-badge blue">Ago - Dic 2026</span>
+                </div>
+                <div class="stat-value" id="stat-total-turnos">--</div>
+                <div class="stat-footer" style="display: flex; flex-direction: column; gap: 2px;">
+                    <span class="stat-sub" id="stat-modalidad-ratio">--</span>
+                    <span class="stat-sub" id="stat-estados-ratio" style="font-weight: 500; color: #a5f3fc;">--</span>
+                </div>
+            </div>
+
+            <div class="stat-card" id="card-capacidad-promedio">
+                <div class="stat-header">
+                    <span class="stat-title">Tope Máximo Mensual</span>
+                    <span class="stat-badge purple">Tope: 64 / mes</span>
+                </div>
+                <div class="stat-value" id="stat-tope-mensual">64</div>
+                <div class="stat-footer">
+                    <span class="stat-sub text-danger" id="stat-meses-sobrecupo">Calculando...</span>
+                </div>
+            </div>
+
+            <div class="stat-card" id="card-pacientes-control">
+                <div class="stat-header">
+                    <span class="stat-title">Pacientes de Control Activos</span>
+                    <span class="stat-badge emerald">Base Activa</span>
+                </div>
+                <div class="stat-value" id="stat-total-pacientes">--</div>
+                <div class="stat-footer">
+                    <span class="stat-sub text-warning" id="stat-inconsistencias-count">-- con huecos</span>
+                </div>
+            </div>
+
+            <div class="stat-card" id="card-alertas-criticas">
+                <div class="stat-header">
+                    <span class="stat-title">Alertas Activas</span>
+                    <span class="stat-badge rose" id="stat-badge-alertas">Atención</span>
+                </div>
+                <div class="stat-value text-rose" id="stat-total-alertas">--</div>
+                <div class="stat-footer">
+                    <span class="stat-sub" id="stat-alertas-detalle">Inactivos y no coincidentes</span>
+                </div>
+            </div>
+
+            <div class="stat-card" id="card-recaudacion-total">
+                <div class="stat-header">
+                    <span class="stat-title">Recaudación (Ago - Dic)</span>
+                    <span class="stat-badge emerald" id="stat-badge-recaudacion">Cobranzas</span>
+                </div>
+                <div class="stat-value text-success" id="stat-total-recaudado">--</div>
+                <div class="stat-footer">
+                    <span class="stat-sub" id="stat-cobranzas-detalle">Calculando pagos...</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Capacidad Mensual (Semáforo de Meses) -->
+        <section class="section-container" id="capacity-section">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">Análisis de Capacidad & Margen Mensual</h2>
+                    <p class="section-desc">Monitoreo de ocupación frente al límite de 64 turnos efectivos (cancelados excluidos)</p>
+                </div>
+                <div class="legend">
+                    <span class="legend-item"><span class="badge-dot green"></span> Margen Disponible (&gt;0)</span>
+                    <span class="legend-item"><span class="badge-dot red"></span> Sobrecupo (&lt;0)</span>
+                </div>
+            </div>
+
+            <div class="capacity-cards-grid" id="capacity-grid">
+                <!-- Injected via JavaScript -->
+            </div>
+        </section>
+
+        <!-- Centro de Alertas y Auditoría (Tabs) -->
+        <section class="section-container" id="alerts-section">
+            <div class="tabs-nav" id="audit-tabs-nav">
+                <button class="tab-btn active" id="tab-btn-pacientes" onclick="switchTab('pacientes')">
+                    👤 Ficha de Pacientes: Controles & Pagos <span class="tab-count blue" id="count-pacientes">0</span>
+                </button>
+                <button class="tab-btn" id="tab-btn-sin-control" onclick="switchTab('sin-control')">
+                    ⚠️ Con Turnos pero Sin Control <span class="tab-count amber" id="count-sin-control">0</span>
+                </button>
+                <button class="tab-btn" id="tab-btn-huecos" onclick="switchTab('huecos')">
+                    📋 Pacientes con Huecos de Control <span class="tab-count" id="count-huecos">0</span>
+                </button>
+                <button class="tab-btn" id="tab-btn-inactivos" onclick="switchTab('inactivos')">
+                    ⚠️ Inactivos con Turnos Futuros <span class="tab-count red" id="count-inactivos">0</span>
+                </button>
+                <button class="tab-btn" id="tab-btn-unmatched" onclick="switchTab('unmatched')">
+                    🔍 Apellidos No Coincidentes <span class="tab-count" id="count-unmatched">0</span>
+                </button>
+            </div>
+
+            <!-- Tab: Ficha de Pacientes: Controles & Pagos -->
+            <div class="tab-panel active" id="panel-pacientes">
+                <div class="filter-bar" style="gap: 1rem; align-items: flex-end;">
+                    <div class="filter-group" style="flex: 1.2; min-width: 260px;">
+                        <label for="select-paciente-especifico">👤 Seleccionar Paciente:</label>
+                        <select id="select-paciente-especifico" onchange="onPacienteSelectChange()" style="width: 100%;">
+                            <option value="">-- Elige un paciente de la lista... --</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group" style="flex: 1.2; min-width: 250px;">
+                        <label for="filter-estado-paciente">🎯 O seleccionar por Filtro:</label>
+                        <select id="filter-estado-paciente" onchange="onFiltroGrupoChange()" style="width: 100%;">
+                            <option value="" selected>-- Selecciona un filtro para ver grupo... --</option>
+                            <option value="deben">⚠️ Pacientes que DEBEN (Cobro pendiente)</option>
+                            <option value="pagados">✅ Pacientes que PAGARON</option>
+                            <option value="con_ausencias">❌ Pacientes con Inasistencias (Ausentes)</option>
+                            <option value="con_futuros">🗓️ Con turnos venideros agendados</option>
+                            <option value="frec_30">⏱️ Frecuencia: Cada 30 días</option>
+                            <option value="frec_60">⏱️ Frecuencia: Cada 60 días</option>
+                            <option value="frec_15">⏱️ Frecuencia: Cada 15 días</option>
+                            <option value="con_atenciones">📋 Con atenciones desde Agosto</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group" style="flex: 1; min-width: 210px;">
+                        <label for="filter-mes-paciente">📅 Filtrar por Mes:</label>
+                        <select id="filter-mes-paciente" onchange="onFiltroMesChange()" style="width: 100%;">
+                            <option value="all" selected>Todos los meses (Ago - Dic)</option>
+                            <option value="8">Agosto (Mes 8)</option>
+                            <option value="9">Septiembre (Mes 9)</option>
+                            <option value="10">Octubre (Mes 10)</option>
+                            <option value="11">Noviembre (Mes 11)</option>
+                            <option value="12">Diciembre (Mes 12)</option>
+                        </select>
+                    </div>
+
+                    <div class="search-box" style="flex: 1; min-width: 200px;">
+                        <span class="search-icon">🔎</span>
+                        <input type="text" id="input-search-historial" placeholder="O buscar por apellido/nombre..." oninput="onSearchHistorialInput()">
+                    </div>
+                </div>
+
+                <!-- Resumen rápido de cobranzas y atenciones (se muestra cuando hay selección o filtro) -->
+                <div class="historial-summary-strip" id="historial-summary-strip" style="display: none;">
+                    <div class="summary-pill blue">
+                        <span class="pill-label">Pacientes en vista:</span>
+                        <strong id="sum-pacientes-count">0</strong>
+                    </div>
+                    <div class="summary-pill emerald">
+                        <span class="pill-label">Total Recaudado:</span>
+                        <strong id="sum-total-recaudado">$0</strong>
+                    </div>
+                    <div class="summary-pill purple">
+                        <span class="pill-label">Atenciones Realizadas:</span>
+                        <strong id="sum-total-atenciones">0</strong>
+                    </div>
+                    <div class="summary-pill rose" id="pill-summary-ausencias">
+                        <span class="pill-label">Inasistencias (Ausentes):</span>
+                        <strong id="sum-total-ausentes">0</strong>
+                    </div>
+                    <div class="summary-pill rose">
+                        <span class="pill-label">Consultas Pendientes (Deben):</span>
+                        <strong id="sum-total-deben">0</strong>
+                    </div>
+                </div>
+
+                <!-- Estado Inicial: Ningún paciente o filtro seleccionado -->
+                <div class="empty-selection-placeholder" id="placeholder-sin-seleccion">
+                    <div class="placeholder-icon">🔎</div>
+                    <h3 class="placeholder-title">Selecciona un paciente o aplica un filtro</h3>
+                    <p class="placeholder-desc">
+                        Para no saturar la vista con todos los pacientes a la vez, elige un <strong>paciente individual</strong> en el selector desplegable, aplica un <strong>filtro de grupo</strong> (ej. <em>"Pacientes que DEBEN"</em>) o escribe un nombre en el buscador.
+                    </p>
+                </div>
+
+                <!-- Tabla de resultados (se muestra al filtrar o seleccionar) -->
+                <div class="table-responsive" id="table-container-pacientes" style="display: none;">
+                    <table class="data-table" id="table-pacientes-historial">
+                        <thead>
+                            <tr>
+                                <th style="min-width: 200px;">Paciente & Frecuencia</th>
+                                <th id="th-col-atenciones" style="min-width: 250px;">Días que se Atendió (desde Agosto)</th>
+                                <th id="th-col-pagos" style="min-width: 190px;">Estado de Pago (Pagó o Debe)</th>
+                                <th style="min-width: 280px;">Meses Venideros (Cuándo Debería Venir)</th>
+                                <th style="min-width: 170px;">Próximo Control Sugerido</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-pacientes-historial">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab: Con Turnos pero Sin Control -->
+            <div class="tab-panel" id="panel-sin-control">
+                <div class="alert-info-box" style="border-left-color: var(--amber);">
+                    <p>⚠️ <strong>Atención Administrativa:</strong> Estos pacientes tienen turnos registrados o agendados en la planilla desde agosto, pero en la nómina maestra de <strong>Pacientes</strong> figuran con <strong>Frecuencia = 0</strong> o sin control periódico (ej. <em>Receta, Finalizado, A demanda</em>). Conviene revisar su ficha para definir frecuencia si corresponde.</p>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table" id="table-sin-control">
+                        <thead>
+                            <tr>
+                                <th>Paciente</th>
+                                <th>Estado en Nómina</th>
+                                <th>Frecuencia Registrada</th>
+                                <th>Turnos desde Agosto</th>
+                                <th>Motivo Detectado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-sin-control">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 1: Pacientes con Meses Faltantes -->
+            <div class="tab-panel" id="panel-huecos">
+                <div class="filter-bar">
+                    <div class="search-box">
+                        <span class="search-icon">🔎</span>
+                        <input type="text" id="input-search-paciente" placeholder="Buscar paciente por nombre o apellido..." oninput="filterInconsistencias()">
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-month">Filtrar mes faltante:</label>
+                        <select id="filter-month" onchange="filterInconsistencias()">
+                            <option value="all">Todos los meses</option>
+                            <option value="8">Agosto (Mes 8)</option>
+                            <option value="9">Septiembre (Mes 9)</option>
+                            <option value="10">Octubre (Mes 10)</option>
+                            <option value="11">Noviembre (Mes 11)</option>
+                            <option value="12">Diciembre (Mes 12)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="data-table" id="table-inconsistencias">
+                        <thead>
+                            <tr>
+                                <th>Paciente</th>
+                                <th>Frecuencia</th>
+                                <th>Meses Faltantes</th>
+                                <th>Inicio 2026</th>
+                                <th>Comentarios / Seguimiento</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-inconsistencias">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 2: Alerta Inactivos -->
+            <div class="tab-panel" id="panel-inactivos">
+                <div class="alert-info-box">
+                    <p>Estos pacientes figuran con <strong>Activo = "No"</strong> o sin estado en la hoja de Pacientes, pero tienen turnos asignados a futuro en la agenda.</p>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table" id="table-inactivos">
+                        <thead>
+                            <tr>
+                                <th>Paciente Inactivo</th>
+                                <th>Turnos Detectados a Futuro</th>
+                                <th>Acción Recomendada</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-inactivos">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 3: Apellidos No Coincidentes -->
+            <div class="tab-panel" id="panel-unmatched">
+                <div class="alert-info-box">
+                    <p>Turnos de Google Calendar que <strong>no coinciden con ningún paciente</strong> (activo ni inactivo). Pueden ser pacientes nuevos que aún no se registraron en la nómina, o bloqueos de agenda (ej. <em>"No poner paciente"</em>).</p>
+                </div>
+                <div class="table-responsive">
+                    <table class="data-table" id="table-unmatched">
+                        <thead>
+                            <tr>
+                                <th>Fecha</th>
+                                <th>Texto Registrado en Agenda</th>
+                                <th>Modalidad Detectada</th>
+                                <th>Tipo Sugerido</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-unmatched">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Distribución y Matriz Semanal de Carga & Comparación Mensual -->
+        <section class="section-container" id="weekly-section">
+            <div class="section-header">
+                <div>
+                    <h2 class="section-title">📊 Matriz de Carga Semanal & Comparación Intermensual</h2>
+                    <p class="section-desc">Cálculo de semanas acotadas al mes (Lunes a Domingo), promedio semanal, detección de semana pico de saturación y comparativa intermensual (M vs M-1)</p>
+                </div>
+            </div>
+
+            <div class="weekly-matrix-grid" id="weekly-matrix-grid">
+                <!-- Tarjetas mensuales inyectadas por JS -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="main-footer" id="main-footer">
+        <div class="footer-container">
+            <span>BMAD Method SDLC • Sistema de Turnos y Auditoría de Agenda</span>
+            <span id="footer-last-sync">Última lectura: --</span>
+        </div>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>

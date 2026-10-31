@@ -1,0 +1,39 @@
+# Dependencias
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Datos y planillas con información personal / clínica (PII / PHI)
+*.xlsx
+*.xls
+*.csv
+~$*.xlsx
+~$*.xls
+
+# Reportes y dumps temporales
+report.json
+reporte_auditoria.json
+dump_data.js
+dump_lnk.js
+check_bugs.js
+check_headers.js
+check_lourdes.js
+audit_debug.js
+audit_debug2.js
+
+# Entornos y logs
+.env
+.env.local
+*.log
+
+# Carpetas de agentes y temporales BMAD
+.agents/
+_bmad/
+_bmad-output/
+
+# Sistema operativo e IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

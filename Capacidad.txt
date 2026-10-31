@@ -1,0 +1,42 @@
+Hola. Necesito que actúes como mi analista de datos y asistente de auditoría de agenda.
+
+El listado de turnos está en d:/MisProyectos/Turnos/Turnos.xlsx en la hoja de turnos (columnas: Fecha, Hora, Paciente, Validacion, Importe, Medio de Pago, Estado Pago, Estado Turno, Comentario) y el listado de pacientes en el mismo archivo en la hoja de pacientes (columnas: Activo, Frecuencia, Nombre, Apellido).
+El tope máximo de mi agenda es de 64 turnos efectivos por mes.
+
+Necesito que escribas y ejecutes un script temporal en Node.js para hacer estas dos tareas principales:
+
+1. Auditoría de Inconsistencias (Pacientes de Control)
+Debes cruzar la agenda con los pacientes del Excel que tengan estado Activo="si" y Frecuencia="control" (ignorando "a demanda" o "cada dos meses"). Avisame qué pacientes tienen "huecos" o meses salteados evaluando desde agosto a diciembre 2026. Reglas:
+
+Tener en cuenta los pacientes con frecuencia: Finalizado. Esto quiere decir tratamiento finalizado.
+
+- REGLA DE LIMPIEZA: Antes de comparar, debes limpiar SIEMPRE las siguientes palabras "ruido" de la agenda: "ctrol", "ctrl", "ctr", "ctl", "control", "p", "v", "1 vez", "vez", "presencial", "virtual".
+- REGLA DE APELLIDOS CON TOLERANCIA Y COMPUESTOS: Exige siempre que el Apellido de Pacientes.xlsx esté presente en el turno. Si el paciente tiene apellido compuesto (ej: "Rubiolo Barbero"), basta con que el turno contenga una de las partes ("Rubiolo") siempre que el nombre coincida. Permite un margen de error ortográfico (similitud > 0.75, ej: "vitozi" = "vitozzi").
+- REGLA DE IGNORAR NO-CONTROLES: Si un turno de la agenda NO coincide con ningún paciente de "Control", busca si coincide con ALGUN OTRO paciente inactivo o de otra frecuencia en Pacientes.xlsx. Si coincide, ignóralo silenciosamente. Solo si NO coincide con nadie en absoluto, ponlo en la "Alerta de Apellidos No Coincidentes".
+- Si un paciente tiene la etiqueta "1 vez" (o empezó este año), exígele controles solo desde el mes de su primer turno.
+- Los turnos que digan "cancelado" o "cancela" (o con Estado Turno="CANCELADO") se ignoran totalmente.
+- Exclusión total: Pacientes con asistencia perfecta no deben figurar en el reporte.
+- Si el paciente tenía la palabra "desestimar" en Comentario/Seguimiento en el archivo viejo, asume Agenda Perfecta.
+- Rescata las columnas "Comentario" y "Seguimiento" de la validación vieja y pásalas a la nueva.
+- Alerta de Inactivos: Verificá si hay pacientes inactivos (Activo="no" o vacío) con turnos a futuro.
+- Fechas: Usa SIEMPRE métodos absolutos (ej. xlsx.SSF.parse_date_code) para evitar saltos por huso horario.
+- Estado Pago: Considerar columna 'Estado Pago' ('PAGADO', 'DEBE') e 'Importe' para el control de cobranzas y atenciones.
+- Estado Turno: Considerar columna 'Estado Turno' con los valores oficiales: 'ATENDIDO', 'CANCELADO', 'AUSENTE'.
+  * 'CANCELADO': Se descarta totalmente del conteo de agenda efectiva, capacidad mensual y auditoría de controles.
+  * 'AUSENTE': Computa la inasistencia (no valida como atención/control efectivo recibido).
+  * 'ATENDIDO': Valida de forma explícita la realización de la consulta o control.
+
+2. Análisis de Capacidad para Pacientes Nuevos
+Quiero saber cuántos turnos hay ocupados por mes (sin contar cancelados). En base al tope de 64, decime de cuánto es el "margen" mes a mes para ingresar pacientes "1 vez".
+
+3. Formato de Salida Obligatorio: 
+- Sobrescribe la lista de pacientes con meses faltantes (y las alertas) en el archivo d:/MisProyectos/Turnos/Validacion_Controles_Actualizado.xlsx.
+- Escribe el resumen de lugares libres y la Alerta de Apellidos directamente acá en el chat.
+
+Necesito al finalizar mostrar: 
+
+1. Evaluar desde agosto a diciembre 2026, Cantidad de turnos dados por semana y por mes, mostrando por semana la cantidad de turnos, para saber que semana viene mas cargada y comparar con los meses anteriores al actual.
+- Criterio de semanas: Semanas de lunes a domingo acotadas al mes (Sem 1: del día 1 al primer domingo; intermedias: lunes a domingo completos; final: lunes a fin de mes).
+- Comparación: Comparar mes a mes contra el mes inmediatamente anterior (M-1) mostrando variación y semana pico resaltada.
+- Descartar los cancelados.
+No inventes datos. Ejecuta el cruce y dame los resultados.
